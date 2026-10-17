@@ -262,6 +262,17 @@ odd `2*a/b` does not fire when the signs of both `a` and `b` are unknown.
   mode and engine state (handlers switched off, a split exploring), so a
   cached result is what recomputing would give.
 - **Generated table first**, then the live handler, then a `_simple` fallback.
+- **Ground zeros** (`core/ground.py`). SymPy leaves constants such as
+  `sqrt(3 + 2*sqrt(2)) - 1 - sqrt(2)` unevaluated. A top-level result
+  without symbols (at most 60 nodes) is rewritten on a copy by two exact
+  identities over the rationals (`sqrt(a + b*sqrt(c))` denested when
+  `a**2 - b**2*c` is a rational square, `1/(a + b*sqrt(c))` rationalized);
+  if the copy evaluates to 0, refine returns 0, else the result unchanged.
+  No numerics, so a constant near 0 (`2*sqrt(2)/10**600`) is never 0.
+  SymPy's tests were not used: `minimal_polynomial` picks factors
+  numerically and calls that constant 0, `equals(0)` too at `10**-1000`,
+  and refine avoids SymPy's simplification machinery; satassume reads
+  `sqrt(2)` as an indeterminate, so its `ask` cannot prove these zero.
 - **Termination** (`core/guard.py`, argued in its docstring): at most
   `MAX_DEPTH = 100` nested refinements; no node re-entering its own
   refinement; at most `MAX_FIRINGS = 500` steps per rewrite chain, and

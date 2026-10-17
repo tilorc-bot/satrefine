@@ -21,7 +21,12 @@ changes, and it replaces ``satrefine.refine`` whenever the
   (:data:`state`: which identity handlers are switched off, whether a split
   is exploring), so a result is what recomputing it would give and repeated
   work neither costs time nor counts against the cap.  A node being refined
-  is not in the cache yet, so a real loop still reaches the cap.
+  is not in the cache yet, so a real loop still reaches the cap;
+* **ground zeros.**  SymPy leaves a constant such as ``sqrt(3 + 2*sqrt(2)) -
+  1 - sqrt(2)`` unevaluated, so its refinement did not show that it is 0.  A
+  top-level result without symbols that :mod:`.ground` proves zero (by exact
+  identities: nested square roots denested, reciprocals of surds
+  rationalized) is returned as ``0``.
 
 ``upstream.refine`` itself is untouched (it must stay behavior-identical
 to SymPy's); handlers written for the vendored driver keep working here.
@@ -37,7 +42,7 @@ from typing import Any
 from sympy.core import Basic, Expr
 
 from .. import config
-from . import hooks
+from . import ground, hooks
 from .guard import (MAX_CALL_FIRINGS, MAX_DEPTH, MAX_FIRINGS, MAX_TOTAL_FIRINGS, RefineLoopError,  # noqa: F401
                     _Call, _short, loop_events, pushed, strict, strict_loops)
 
@@ -143,7 +148,8 @@ def refine(expr: Any, assumptions: Any = True) -> Any:
     how far the engine got before a query happened to expose the
     contradiction must not decide between a result and a crash.  Inside the
     call the error still propagates (a case split drops an inconsistent
-    branch that way)."""
+    branch that way).  A result without symbols that :func:`.ground.zero_or_self`
+    proves zero is returned as ``0``."""
     if _calls:
         return _refine(expr, assumptions)
     call = _Call()
@@ -170,7 +176,7 @@ def refine(expr: Any, assumptions: Any = True) -> Any:
         _results.pop()
         hooks.dispatcher.ask = saved_ask
     if call.tripped is None:
-        return result
+        return ground.zero_or_self(result)
     if strict():
         raise RefineLoopError(call.tripped) from cause
     loop_events.append((expr, call.tripped))
